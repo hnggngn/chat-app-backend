@@ -23,3 +23,6 @@ go.work
 
 # IDEA
 .idea
+
+# Environment
+.env
