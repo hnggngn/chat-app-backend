@@ -6,8 +6,8 @@ import (
 )
 
 type AuthService interface {
-	GetUserByUsername(q *generated.Queries, username string) (generated.User, error)
-	CreateNewUser(q *generated.Queries, input *repositories.AuthInput) error
+	GetUserByUsername(username string) (generated.User, error)
+	CreateNewUser(input *repositories.AuthInput) error
 	HashPassword(password string) ([]byte, error)
 	VerifyPassword(currentPassword, password string) (bool, error)
 }
@@ -24,15 +24,15 @@ func (a *authService) VerifyPassword(currentPassword, password string) (bool, er
 	return a.authRepository.VerifyPassword(currentPassword, password)
 }
 
-func (a *authService) CreateNewUser(q *generated.Queries, input *repositories.AuthInput) error {
-	return a.authRepository.CreateNewUser(q, input)
+func (a *authService) CreateNewUser(input *repositories.AuthInput) error {
+	return a.authRepository.CreateNewUser(input)
 }
 
-func (a *authService) GetUserByUsername(q *generated.Queries, username string) (generated.User, error) {
-	return a.authRepository.GetUserByUsername(q, username)
+func (a *authService) GetUserByUsername(username string) (generated.User, error) {
+	return a.authRepository.GetUserByUsername(username)
 }
 
-func NewService(r repositories.AuthRepository) AuthService {
+func NewAuthService(r repositories.AuthRepository) AuthService {
 	return &authService{
 		authRepository: r,
 	}

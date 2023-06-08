@@ -5,11 +5,12 @@
 package generated
 
 import (
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type User struct {
-	ID        pgtype.UUID        `json:"id"`
+	ID        uuid.UUID          `json:"id"`
 	Username  string             `json:"username"`
 	Password  string             `json:"password"`
 	Avatar    pgtype.Text        `json:"avatar"`

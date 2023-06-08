@@ -8,6 +8,7 @@ package generated
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -27,6 +28,17 @@ func (q *Queries) CreateNewUser(ctx context.Context, arg CreateNewUserParams) er
 	return err
 }
 
+const deleteUser = `-- name: DeleteUser :exec
+delete
+from users
+where id = $1
+`
+
+func (q *Queries) DeleteUser(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteUser, id)
+	return err
+}
+
 const deleteUserByUsername = `-- name: DeleteUserByUsername :exec
 delete
 from users
@@ -36,6 +48,31 @@ where username = $1
 func (q *Queries) DeleteUserByUsername(ctx context.Context, username string) error {
 	_, err := q.db.Exec(ctx, deleteUserByUsername, username)
 	return err
+}
+
+const getUserByID = `-- name: GetUserByID :one
+select username, avatar, created_at, updated_at
+from users
+where id = $1
+`
+
+type GetUserByIDRow struct {
+	Username  string             `json:"username"`
+	Avatar    pgtype.Text        `json:"avatar"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+func (q *Queries) GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow, error) {
+	row := q.db.QueryRow(ctx, getUserByID, id)
+	var i GetUserByIDRow
+	err := row.Scan(
+		&i.Username,
+		&i.Avatar,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const getUserByUsername = `-- name: GetUserByUsername :one
@@ -56,4 +93,30 @@ func (q *Queries) GetUserByUsername(ctx context.Context, username string) (User,
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const updateUser = `-- name: UpdateUser :exec
+update users as u
+set username   = coalesce(nullif($1, ''), u.username),
+    password   = coalesce(nullif($2, ''), u.password),
+    avatar     = coalesce(nullif($3, ''), u.avatar),
+    updated_at = timezone('utc', now())
+where id = $4
+`
+
+type UpdateUserParams struct {
+	Column1 interface{} `json:"column_1"`
+	Column2 interface{} `json:"column_2"`
+	Column3 interface{} `json:"column_3"`
+	ID      uuid.UUID   `json:"id"`
+}
+
+func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
+	_, err := q.db.Exec(ctx, updateUser,
+		arg.Column1,
+		arg.Column2,
+		arg.Column3,
+		arg.ID,
+	)
+	return err
 }

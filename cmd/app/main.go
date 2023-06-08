@@ -3,6 +3,7 @@ package main
 import (
 	"chat_backend/internal/delivery/router"
 	"chat_backend/pkg/utils"
+	"github.com/cloudinary/cloudinary-go/v2"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/helmet"
@@ -23,6 +24,7 @@ func main() {
 	app := fiber.New(fiber.Config{
 		StrictRouting: true,
 		CaseSensitive: true,
+		BodyLimit:     10 * 1024 * 1024,
 	})
 
 	app.Use(cors.New(cors.Config{
@@ -40,7 +42,9 @@ func main() {
 	db, queries := utils.Database()
 	defer db.Close()
 
-	router.AppRouter(app, queries)
+	cld, _ := cloudinary.NewFromURL(os.Getenv("CLOUDINARY_URL"))
+
+	router.AppRouter(app, queries, cld)
 
 	log.Fatalln(app.Listen(":6060"))
 }

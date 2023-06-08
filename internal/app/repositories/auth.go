@@ -10,8 +10,8 @@ import (
 )
 
 type AuthRepository interface {
-	GetUserByUsername(q *generated.Queries, username string) (generated.User, error)
-	CreateNewUser(q *generated.Queries, input *AuthInput) error
+	GetUserByUsername(username string) (generated.User, error)
+	CreateNewUser(input *AuthInput) error
 	HashPassword(password string) ([]byte, error)
 	VerifyPassword(currentPassword, password string) (bool, error)
 }
@@ -34,13 +34,13 @@ type AuthInput struct {
 	Password string `json:"password" validate:"required|max_len:100"`
 }
 
-func (r *authRepository) CreateNewUser(q *generated.Queries, input *AuthInput) error {
+func (r *authRepository) CreateNewUser(input *AuthInput) error {
 	hash, err := r.HashPassword(input.Password)
 	if err != nil {
 		return err
 	}
 
-	err = q.CreateNewUser(context.Background(), generated.CreateNewUserParams{
+	err = r.Queries.CreateNewUser(context.Background(), generated.CreateNewUserParams{
 		Username: input.Username,
 		Password: string(hash),
 		Avatar: pgtype.Text{
@@ -58,11 +58,11 @@ func (r *authRepository) CreateNewUser(q *generated.Queries, input *AuthInput) e
 	return nil
 }
 
-func (r *authRepository) GetUserByUsername(q *generated.Queries, username string) (generated.User, error) {
-	return q.GetUserByUsername(context.Background(), username)
+func (r *authRepository) GetUserByUsername(username string) (generated.User, error) {
+	return r.Queries.GetUserByUsername(context.Background(), username)
 }
 
-func NewRepo(queries *generated.Queries) AuthRepository {
+func NewAuthRepo(queries *generated.Queries) AuthRepository {
 	return &authRepository{
 		Queries: queries,
 	}

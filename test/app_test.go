@@ -7,6 +7,7 @@ import (
 	"chat_backend/pkg/utils"
 	"context"
 	"encoding/json"
+	"github.com/cloudinary/cloudinary-go/v2"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/helmet"
@@ -49,7 +50,9 @@ func appTest() (*fiber.App, *generated.Queries) {
 
 	_, queries := utils.Database()
 
-	router.AppRouter(app, queries)
+	cld, _ := cloudinary.NewFromURL(os.Getenv("CLOUDINARY_URL"))
+
+	router.AppRouter(app, queries, cld)
 
 	return app, queries
 }
@@ -60,9 +63,10 @@ type TestCase struct {
 }
 
 const (
-	letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	username    = "test-user"
-	password    = "test-password"
+	letterBytes    = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	username       = "test-user"
+	updateUsername = "test-user-updated"
+	password       = "test-password"
 )
 
 func genValue(l int) string {
@@ -79,14 +83,17 @@ func genValue(l int) string {
 func afterAll() func(t *testing.T) {
 	_, queries := appTest()
 	_ = queries.DeleteUserByUsername(context.Background(), username)
+	_ = queries.DeleteUserByUsername(context.Background(), updateUsername)
 	return func(t *testing.T) {
 		t.Log("Clean up.")
 	}
 }
 
-func TestSignUp(t *testing.T) {
-	app, _ := appTest()
+var (
+	app, _ = appTest()
+)
 
+func TestSignUp(t *testing.T) {
 	defer afterAll()
 
 	t.Run("Should return error when username and password is empty", func(t *testing.T) {
@@ -240,8 +247,6 @@ func TestSignUp(t *testing.T) {
 }
 
 func TestLogin(t *testing.T) {
-	app, _ := appTest()
-
 	defer afterAll()
 
 	t.Run("Should return error when username and password is empty", func(t *testing.T) {
@@ -391,5 +396,193 @@ func TestLogin(t *testing.T) {
 		for _, test := range tests {
 			assert.Equal(t, test.expected, test.actual)
 		}
+	})
+}
+
+func TestLogout(t *testing.T) {
+	defer afterAll()
+
+	t.Run("Should return error when not logged", func(t *testing.T) {
+		req := httptest.NewRequest(fiber.MethodPost, "/api/auth/signout", nil)
+		res, _ := app.Test(req)
+
+		assert.Equal(t, fiber.StatusUnauthorized, res.StatusCode)
+	})
+
+	t.Run("Should log out", func(t *testing.T) {
+		inputSchema := fiber.Map{
+			"username": username,
+			"password": password,
+		}
+
+		input, _ := json.Marshal(inputSchema)
+
+		signUpReq := httptest.NewRequest(fiber.MethodPost, "/api/auth/signup", bytes.NewReader(input))
+		signUpReq.Header.Set("Content-Type", "application/json")
+		_, _ = app.Test(signUpReq)
+
+		loginReq := httptest.NewRequest(fiber.MethodPost, "/api/auth/login", bytes.NewReader(input))
+		loginReq.Header.Set("Content-Type", "application/json")
+		loginRes, _ := app.Test(loginReq)
+
+		cookie := loginRes.Cookies()
+
+		req := httptest.NewRequest(fiber.MethodPost, "/api/auth/signout", nil)
+		req.AddCookie(cookie[0])
+		res, _ := app.Test(req)
+
+		assert.Equal(t, fiber.StatusOK, res.StatusCode)
+	})
+}
+
+func TestGetProfile(t *testing.T) {
+	defer afterAll()
+
+	t.Run("Should return error when not logged", func(t *testing.T) {
+		req := httptest.NewRequest(fiber.MethodGet, "/api/user/profile", nil)
+		res, _ := app.Test(req)
+
+		assert.Equal(t, fiber.StatusUnauthorized, res.StatusCode)
+	})
+
+	t.Run("Should return data", func(t *testing.T) {
+		inputSchema := fiber.Map{
+			"username": username,
+			"password": password,
+		}
+
+		input, _ := json.Marshal(inputSchema)
+
+		signUpReq := httptest.NewRequest(fiber.MethodPost, "/api/auth/signup", bytes.NewReader(input))
+		signUpReq.Header.Set("Content-Type", "application/json")
+		_, _ = app.Test(signUpReq)
+
+		loginReq := httptest.NewRequest(fiber.MethodPost, "/api/auth/login", bytes.NewReader(input))
+		loginReq.Header.Set("Content-Type", "application/json")
+		loginRes, _ := app.Test(loginReq)
+
+		cookie := loginRes.Cookies()
+
+		req := httptest.NewRequest(fiber.MethodGet, "/api/user/profile", nil)
+		req.AddCookie(cookie[0])
+		res, _ := app.Test(req)
+
+		body, _ := io.ReadAll(res.Body)
+
+		assert.Equal(t, fiber.StatusOK, res.StatusCode)
+		assert.NotEmpty(t, body)
+	})
+}
+
+func TestUpdateProfile(t *testing.T) {
+	defer afterAll()
+
+	t.Run("Should return error when not logged", func(t *testing.T) {
+		req := httptest.NewRequest(fiber.MethodPatch, "/api/user/profile/update", nil)
+		res, _ := app.Test(req)
+
+		assert.Equal(t, fiber.StatusUnauthorized, res.StatusCode)
+	})
+
+	t.Run("Should update 1 field", func(t *testing.T) {
+		inputSchema := fiber.Map{
+			"username": username,
+			"password": password,
+		}
+
+		input, _ := json.Marshal(inputSchema)
+
+		signUpReq := httptest.NewRequest(fiber.MethodPost, "/api/auth/signup", bytes.NewReader(input))
+		signUpReq.Header.Set("Content-Type", "application/json")
+		_, _ = app.Test(signUpReq)
+
+		loginReq := httptest.NewRequest(fiber.MethodPost, "/api/auth/login", bytes.NewReader(input))
+		loginReq.Header.Set("Content-Type", "application/json")
+		loginRes, _ := app.Test(loginReq)
+
+		cookie := loginRes.Cookies()
+
+		inputUpdateSchema := fiber.Map{
+			"username": updateUsername,
+		}
+
+		inputUpdate, _ := json.Marshal(inputUpdateSchema)
+
+		req := httptest.NewRequest(fiber.MethodPatch, "/api/user/profile/update", bytes.NewReader(inputUpdate))
+		req.Header.Set("Content-Type", "application/json")
+		req.AddCookie(cookie[0])
+		res, _ := app.Test(req)
+
+		assert.Equal(t, fiber.StatusOK, res.StatusCode)
+	})
+
+	t.Run("Should update 2 field", func(t *testing.T) {
+		inputSchema := fiber.Map{
+			"username": username,
+			"password": password,
+		}
+
+		input, _ := json.Marshal(inputSchema)
+
+		signUpReq := httptest.NewRequest(fiber.MethodPost, "/api/auth/signup", bytes.NewReader(input))
+		signUpReq.Header.Set("Content-Type", "application/json")
+		_, _ = app.Test(signUpReq)
+
+		loginReq := httptest.NewRequest(fiber.MethodPost, "/api/auth/login", bytes.NewReader(input))
+		loginReq.Header.Set("Content-Type", "application/json")
+		loginRes, _ := app.Test(loginReq)
+
+		cookie := loginRes.Cookies()
+
+		inputUpdateSchema := fiber.Map{
+			"username": updateUsername,
+			"password": "blah",
+		}
+
+		inputUpdate, _ := json.Marshal(inputUpdateSchema)
+
+		req := httptest.NewRequest(fiber.MethodPatch, "/api/user/profile/update", bytes.NewReader(inputUpdate))
+		req.Header.Set("Content-Type", "application/json")
+		req.AddCookie(cookie[0])
+		res, _ := app.Test(req)
+
+		assert.Equal(t, fiber.StatusOK, res.StatusCode)
+	})
+}
+
+func TestDeleteUser(t *testing.T) {
+	defer afterAll()
+
+	t.Run("Should return error when not logged", func(t *testing.T) {
+		req := httptest.NewRequest(fiber.MethodDelete, "/api/user/profile/delete", nil)
+		res, _ := app.Test(req)
+
+		assert.Equal(t, fiber.StatusUnauthorized, res.StatusCode)
+	})
+
+	t.Run("Should delete user data and log out", func(t *testing.T) {
+		inputSchema := fiber.Map{
+			"username": username,
+			"password": password,
+		}
+
+		input, _ := json.Marshal(inputSchema)
+
+		signUpReq := httptest.NewRequest(fiber.MethodPost, "/api/auth/signup", bytes.NewReader(input))
+		signUpReq.Header.Set("Content-Type", "application/json")
+		_, _ = app.Test(signUpReq)
+
+		loginReq := httptest.NewRequest(fiber.MethodPost, "/api/auth/login", bytes.NewReader(input))
+		loginReq.Header.Set("Content-Type", "application/json")
+		loginRes, _ := app.Test(loginReq)
+
+		cookie := loginRes.Cookies()
+
+		req := httptest.NewRequest(fiber.MethodDelete, "/api/user/profile/delete", nil)
+		req.AddCookie(cookie[0])
+		res, _ := app.Test(req)
+
+		assert.Equal(t, fiber.StatusOK, res.StatusCode)
+		assert.Empty(t, res.Cookies()[0].Value)
 	})
 }

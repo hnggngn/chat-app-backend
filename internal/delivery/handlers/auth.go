@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"chat_backend/generated"
 	"chat_backend/internal/app/repositories"
 	"chat_backend/internal/app/services"
 	"chat_backend/pkg/utils"
@@ -14,7 +13,11 @@ import (
 	"time"
 )
 
-func SignUpHandler(s services.AuthService, q *generated.Queries) fiber.Handler {
+var (
+	prod, _ = strconv.ParseBool(os.Getenv("PROD"))
+)
+
+func SignUpHandler(s services.AuthService) fiber.Handler {
 	return func(ctx *fiber.Ctx) error {
 		input := new(repositories.AuthInput)
 
@@ -27,18 +30,15 @@ func SignUpHandler(s services.AuthService, q *generated.Queries) fiber.Handler {
 			return ctx.Status(fiber.StatusForbidden).JSON(v.Errors)
 		}
 
-		user, err := s.GetUserByUsername(q, input.Username)
-		if err != nil {
-			log.Printf("Error in /signup - check user exist: %v", err)
-		}
+		user, _ := s.GetUserByUsername(input.Username)
 
-		if user.ID.Valid {
+		if len(user.Username) > 0 {
 			return ctx.Status(fiber.StatusForbidden).JSON(fiber.Map{
 				"message": "User already exists.",
 			})
 		}
 
-		err = s.CreateNewUser(q, input)
+		err := s.CreateNewUser(input)
 		if err != nil {
 			log.Printf("Error in /signup - create new user: %v", err)
 		}
@@ -47,7 +47,7 @@ func SignUpHandler(s services.AuthService, q *generated.Queries) fiber.Handler {
 	}
 }
 
-func LoginHandler(s services.AuthService, q *generated.Queries) fiber.Handler {
+func LoginHandler(s services.AuthService) fiber.Handler {
 	return func(ctx *fiber.Ctx) error {
 		input := new(repositories.AuthInput)
 
@@ -60,12 +60,9 @@ func LoginHandler(s services.AuthService, q *generated.Queries) fiber.Handler {
 			return ctx.Status(fiber.StatusForbidden).JSON(v.Errors)
 		}
 
-		user, err := s.GetUserByUsername(q, input.Username)
-		if err != nil {
-			log.Printf("Error in /login - check user exist: %v", err)
-		}
+		user, _ := s.GetUserByUsername(input.Username)
 
-		if !user.ID.Valid {
+		if len(user.Username) == 0 {
 			return ctx.Status(fiber.StatusForbidden).JSON(fiber.Map{
 				"message": "User not exists.",
 			})
@@ -81,13 +78,11 @@ func LoginHandler(s services.AuthService, q *generated.Queries) fiber.Handler {
 			})
 		}
 
-		userID, _ := user.ID.MarshalJSON()
-		token, err := pasetoware.CreateToken(utils.GetPrivateKey(), string(userID), 1*time.Hour, pasetoware.PurposePublic)
+		userID := user.ID.String()
+		token, err := pasetoware.CreateToken(utils.GetPrivateKey(), userID, 1*time.Hour, pasetoware.PurposePublic)
 		if err != nil {
 			log.Printf("Error in /login - create new paseto token: %v", err)
 		}
-
-		prod, _ := strconv.ParseBool(os.Getenv("PROD"))
 
 		ctx.Cookie(&fiber.Cookie{
 			Name:     "chat_app",
@@ -97,6 +92,20 @@ func LoginHandler(s services.AuthService, q *generated.Queries) fiber.Handler {
 			SameSite: fiber.CookieSameSiteStrictMode,
 		})
 
+		return ctx.SendStatus(fiber.StatusOK)
+	}
+}
+
+func SignOutHandler() fiber.Handler {
+	return func(ctx *fiber.Ctx) error {
+		ctx.Cookie(&fiber.Cookie{
+			Name:     "chat_app",
+			Value:    "",
+			HTTPOnly: prod,
+			Secure:   prod,
+			SameSite: fiber.CookieSameSiteStrictMode,
+			Expires:  time.Now().Add(-time.Hour),
+		})
 		return ctx.SendStatus(fiber.StatusOK)
 	}
 }
