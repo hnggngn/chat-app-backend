@@ -13,6 +13,22 @@ import (
 	"time"
 )
 
+type GetUserByIDRowSwagger struct {
+	Username  string `json:"username"`
+	Avatar    string `json:"avatar"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
+}
+
+// GetProfileHandler retrieves the user profile.
+//
+//	@Summary		Get user profile
+//	@Description	Retrieves the user profile
+//	@Tags			Profile
+//	@Produce		plain
+//	@Success		200	{object}	GetUserByIDRowSwagger
+//	@Failure		500	{object}	ErrorResponseSwagger
+//	@Router			/user/profile [get]
 func GetProfileHandler(s services.UserService) fiber.Handler {
 	return func(ctx *fiber.Ctx) error {
 		userID, err := uuid.Parse(ctx.Locals(pasetoware.DefaultContextKey).(string))
@@ -29,6 +45,20 @@ func GetProfileHandler(s services.UserService) fiber.Handler {
 	}
 }
 
+// UpdateProfileHandler updates the user profile.
+//
+//	@Summary		Update user profile
+//	@Description	Updates the user profile
+//	@Tags			Profile
+//	@Accept			json
+//	@Accept			mpfd
+//	@Produce		plain
+//	@Param			avatar	formData	file					false	"Avatar file (jpeg/png)"
+//	@Param			input	body		repositories.AuthInput	false	"User update details"
+//	@Success		200		{string}	string					"OK"
+//	@Failure		400
+//	@Failure		422
+//	@Router			/user/profile/update [patch]
 func UpdateProfileHandler(s services.UserService) fiber.Handler {
 	return func(ctx *fiber.Ctx) error {
 		input := new(repositories.UpdateInput)
@@ -73,6 +103,15 @@ func UpdateProfileHandler(s services.UserService) fiber.Handler {
 	}
 }
 
+// DeleteUserHandler deletes the user account.
+//
+//	@Summary		Delete user account
+//	@Description	Deletes the user account
+//	@Tags			Profile
+//	@Produce		plain
+//	@Success		200	{string}	string	"OK"
+//	@Failure		500	{object}	ErrorResponseSwagger
+//	@Router			/user/profile/delete [delete]
 func DeleteUserHandler(s services.UserService) fiber.Handler {
 	return func(ctx *fiber.Ctx) error {
 		userID, err := uuid.Parse(ctx.Locals(pasetoware.DefaultContextKey).(string))

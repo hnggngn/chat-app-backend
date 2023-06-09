@@ -9,6 +9,9 @@ import (
 	"github.com/cloudinary/cloudinary-go/v2"
 	pasetoware "github.com/gofiber/contrib/paseto"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/monitor"
+	"github.com/gofiber/swagger"
+	"time"
 )
 
 func AppRouter(app *fiber.App, queries *generated.Queries, cld *cloudinary.Cloudinary) {
@@ -16,6 +19,13 @@ func AppRouter(app *fiber.App, queries *generated.Queries, cld *cloudinary.Cloud
 	authService := services.NewAuthService(authRepo)
 	userRepo := repositories.NewUserRepo(queries, cld, authRepo)
 	userService := services.NewUserService(userRepo)
+
+	app.Get("/metrics", monitor.New(monitor.Config{
+		Title:   "ChatApp Resource Monitor",
+		Refresh: 5 * time.Second,
+	}))
+
+	app.Get("/swagger/*", swagger.HandlerDefault)
 
 	api := app.Group("/api")
 	auth := api.Group("/auth")

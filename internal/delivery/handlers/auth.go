@@ -17,6 +17,22 @@ var (
 	prod, _ = strconv.ParseBool(os.Getenv("PROD"))
 )
 
+type ErrorResponseSwagger struct {
+	Message string `json:"message"`
+}
+
+// SignUpHandler handles the signup route.
+//
+//	@Summary		Handle user registration and create a new user.
+//	@Description	Handle user registration and create a new user.
+//	@Tags			Authentication
+//	@Accept			json
+//	@Produce		plain
+//	@Param			input	body		repositories.AuthInput	true	"User registration details"
+//	@Success		201		{string}	string					"Created"
+//	@Failure		400		{object}	ErrorResponseSwagger
+//	@Failure		403
+//	@Router			/auth/signup [post]
 func SignUpHandler(s services.AuthService) fiber.Handler {
 	return func(ctx *fiber.Ctx) error {
 		input := new(repositories.AuthInput)
@@ -47,6 +63,18 @@ func SignUpHandler(s services.AuthService) fiber.Handler {
 	}
 }
 
+// LoginHandler handles the login route.
+//
+//	@Summary		Handle user login and generate an authentication token.
+//	@Description	Handle user login and generate an authentication token.
+//	@Tags			Authentication
+//	@Accept			json
+//	@Produce		plain
+//	@Param			input	body		repositories.AuthInput	true	"User login details"
+//	@Success		200		{string}	string					"OK"
+//	@Failure		400		{object}	ErrorResponseSwagger
+//	@Failure		403
+//	@Router			/auth/login [post]
 func LoginHandler(s services.AuthService) fiber.Handler {
 	return func(ctx *fiber.Ctx) error {
 		input := new(repositories.AuthInput)
@@ -96,6 +124,14 @@ func LoginHandler(s services.AuthService) fiber.Handler {
 	}
 }
 
+// SignOutHandler handles the signout route.
+//
+//	@Summary		Handle user signout and remove the authentication token.
+//	@Description	Handle user signout and remove the authentication token.
+//	@Tags			Authentication
+//	@Produce		plain
+//	@Success		200	{string}	string	"OK"
+//	@Router			/auth/signout [post]
 func SignOutHandler() fiber.Handler {
 	return func(ctx *fiber.Ctx) error {
 		ctx.Cookie(&fiber.Cookie{
